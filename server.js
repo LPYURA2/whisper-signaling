@@ -49,6 +49,24 @@ wss.on("connection", (ws) => {
 
             }
 
+            if (data.type === "message") {
+
+                const target = peers.get(data.to);
+
+                if (!target) {
+                    return;
+                }
+
+                if (target.readyState === WebSocket.OPEN) {
+
+                    target.send(JSON.stringify({
+                        type: "message",
+                        from:  data.from,
+                        text: data.text
+                    }));
+                }
+            }
+
         } catch (err) {
 
             console.error("[WS ERROR]", err);
