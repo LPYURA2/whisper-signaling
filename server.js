@@ -2,23 +2,35 @@ const WebSocket = require("ws");
 
 const PORT = process.env.PORT || 3000;
 
-const wss = new WebSocket.Server({ port: PORT });
+const wss = new WebSocket.Server({
+    port: PORT
+});
 
 const peers = new Map();
 
 function broadcastPeers() {
 
-    const peerList = [...peers.keys()];
+    const peerList = [
+        ...peers.keys()
+    ];
 
     const packet = JSON.stringify({
+
         type: "peers",
+
         peers: peerList
+
     });
 
     for (const ws of peers.values()) {
 
-        if (ws.readyState === WebSocket.OPEN) {
+        if (
+            ws.readyState ===
+            WebSocket.OPEN
+        ) {
+
             ws.send(packet);
+
         }
 
     }
@@ -29,21 +41,31 @@ wss.on("connection", (ws) => {
 
     let peerId = null;
 
-    console.log("[WS] connected");
+    console.log(
+        "[WS] connected"
+    );
 
     ws.on("message", (message) => {
 
         try {
 
-            const data = JSON.parse(message);
+            const data =
+                JSON.parse(message);
 
             if (data.type === "join") {
 
-                peerId = data.peerId;
+                peerId =
+                    data.peerId;
 
-                peers.set(peerId, ws);
+                peers.set(
+                    peerId,
+                    ws
+                );
 
-                console.log("[Peer] joined:", peerId);
+                console.log(
+                    "[Peer] joined:",
+                    peerId
+                );
 
                 broadcastPeers();
 
@@ -51,25 +73,136 @@ wss.on("connection", (ws) => {
 
             if (data.type === "message") {
 
-                const target = peers.get(data.to);
+                const target =
+                    peers.get(data.to);
 
                 if (!target) {
                     return;
                 }
 
-                if (target.readyState === WebSocket.OPEN) {
+                if (
+                    target.readyState ===
+                    WebSocket.OPEN
+                ) {
 
-                    target.send(JSON.stringify({
-                        type: "message",
-                        from:  data.from,
-                        text: data.text
-                    }));
+                    target.send(
+                        JSON.stringify({
+
+                            type: "message",
+
+                            from: data.from,
+
+                            text: data.text
+
+                        })
+                    );
+
                 }
+
+            }
+
+            if (data.type === "offer") {
+
+                const target =
+                    peers.get(data.target);
+
+                if (!target) {
+                    return;
+                }
+
+                if (
+                    target.readyState ===
+                    WebSocket.OPEN
+                ) {
+
+                    target.send(
+                        JSON.stringify({
+
+                            type: "offer",
+
+                            from: data.from,
+
+                            offer: data.offer
+
+                        })
+                    );
+
+                }
+
+            }
+
+            if (data.type === "answer") {
+
+                const target =
+                    peers.get(data.target);
+
+                if (!target) {
+                    return;
+                }
+
+                if (
+                    target.readyState ===
+                    WebSocket.OPEN
+                ) {
+
+                    target.send(
+                        JSON.stringify({
+
+                            type: "answer",
+
+                            from: data.from,
+
+                            answer: data.answer
+
+                        })
+                    );
+
+                }
+
+            }
+
+            if (
+                data.type ===
+                "ice-candidate"
+            ) {
+
+                const target =
+                    peers.get(data.target);
+
+                if (!target) {
+                    return;
+                }
+
+                if (
+                    target.readyState ===
+                    WebSocket.OPEN
+                ) {
+
+                    target.send(
+                        JSON.stringify({
+
+                            type:
+                                "ice-candidate",
+
+                            from:
+                                data.from,
+
+                            candidate:
+                                data.candidate
+
+                        })
+                    );
+
+                }
+
             }
 
         } catch (err) {
 
-            console.error("[WS ERROR]", err);
+            console.error(
+                "[WS ERROR]",
+                err
+            );
 
         }
 
@@ -81,7 +214,10 @@ wss.on("connection", (ws) => {
 
             peers.delete(peerId);
 
-            console.log("[Peer] left:", peerId);
+            console.log(
+                "[Peer] left:",
+                peerId
+            );
 
             broadcastPeers();
 
@@ -91,4 +227,6 @@ wss.on("connection", (ws) => {
 
 });
 
-console.log("[Whisper Signaling] running");
+console.log(
+    "[Whisper Signaling] running"
+);
