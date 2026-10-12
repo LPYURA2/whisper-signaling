@@ -52,20 +52,54 @@ wss.on("connection", (ws) => {
             const data =
                 JSON.parse(message);
 
+            if (data.type !== "join") {
+                // Replaced/unauthenticated sockets must not inject stale signals.
+                if (!peerId || peers.get(peerId) !== ws) {
+                    return;
+                }
+
+                // The sender identity is established by `join`, not by packet input.
+                if (data.from !== undefined && data.from !== peerId) {
+                    console.warn("[WS] rejected sender ID mismatch:", peerId);
+                    return;
+                }
+            }
+
             if (data.type === "join") {
 
-                peerId =
-                    data.peerId;
+                if (
+                    typeof data.peerId !== "string" ||
+                    data.peerId.trim().length === 0 ||
+                    data.peerId.length > 128
+                ) {
+                    ws.send(JSON.stringify({
+                        type: "signaling-error",
+                        code: "invalid-peer-id"
+                    }));
+                    return;
+                }
 
-                peers.set(
-                    peerId,
-                    ws
-                );
+                const requestedPeerId = data.peerId.trim();
 
-                console.log(
-                    "[Peer] joined:",
+                // If this socket changes identity, remove only its own old mapping.
+                if (
+                    peerId &&
+                    peerId !== requestedPeerId &&
+                    peers.get(peerId) === ws
+                ) {
+                    peers.delete(peerId);
+                }
+
+                peerId = requestedPeerId;
+                peers.set(peerId, ws);
+
+                console.log("[Peer] joined:", peerId);
+
+                // The client must not start WebRTC until this acknowledgement arrives.
+                ws.send(JSON.stringify({
+                    type: "signaling-ready",
                     peerId
-                );
+                }));
 
                 broadcastPeers();
 
@@ -210,7 +244,9 @@ wss.on("connection", (ws) => {
 
     ws.on("close", () => {
 
-        if (peerId) {
+        // An older socket may close after a newer socket has replaced it.
+        // Only the currently registered socket is allowed to remove this peer.
+        if (peerId && peers.get(peerId) === ws) {
 
             peers.delete(peerId);
 
